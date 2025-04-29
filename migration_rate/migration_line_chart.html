@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Net Migration (2020–2023)</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 40px;
+    }
+    .line {
+      fill: none;
+      stroke-width: 2;
+    }
+    .axis-label {
+      font-size: 14px;
+    }
+    .country-label {
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<h3>Net Migration (2020–2023) — Selected Countries</h3>
+<svg width="900" height="600"></svg>
+
+<script>
+  const svg = d3.select("svg"),
+        margin = {top: 60, right: 150, bottom: 50, left: 80},
+        width = +svg.attr("width") - margin.left - margin.right,
+        height = +svg.attr("height") - margin.top - margin.bottom,
+        g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+  d3.csv("migration_selected_countries.csv").then(data => {
+    data.forEach(d => {
+      d.Year = +d.Year;
+      d.NetMigration = +d["Net Migration"];
+    });
+
+    // Filter for years 2020-2023
+    data = data.filter(d => d.Year >= 2020);
+
+    const countries = Array.from(new Set(data.map(d => d["Country Name"])));
+
+    const x = d3.scaleLinear()
+      .domain(d3.extent(data, d => d.Year))
+      .range([0, width]);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d.NetMigration)]).nice()
+      .range([height, 0]);
+
+    const xAxis = d3.axisBottom(x).tickFormat(d3.format("d"));
+    const yAxis = d3.axisLeft(y);
+
+    g.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(xAxis);
+
+    g.append("g").call(yAxis);
+
+    const line = d3.line()
+      .x(d => x(d.Year))
+      .y(d => y(d.NetMigration));
+
+    const countryData = d3.groups(data, d => d["Country Name"]);
+
+    color.domain(countries);
+
+    countryData.forEach(([country, values]) => {
+      g.append("path")
+        .datum(values)
+        .attr("class", "line")
+        .attr("stroke", color(country))
+        .attr("d", line);
+
+      const last = values[values.length - 1];
+      g.append("text")
+        .datum(last)
+        .attr("x", x(last.Year) + 5)
+        .attr("y", y(last.NetMigration))
+        .attr("fill", color(country))
+        .attr("class", "country-label")
+        .text(country);
+    });
+  });
+</script>
+
+</body>
+</html>

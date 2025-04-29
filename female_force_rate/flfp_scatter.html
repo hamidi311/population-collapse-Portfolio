@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FLFP (2023) vs. Fertility Rate (2022) – Selected Countries</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 40px;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    circle {
+      fill: steelblue;
+      opacity: 0.8;
+    }
+
+    circle:hover {
+      stroke: #000;
+      stroke-width: 1px;
+    }
+  </style>
+</head>
+<body>
+
+<h3>FLFP (2023) vs. Fertility Rate (2022) – U.S., France, UK, Germany, Australia</h3>
+<svg width="800" height="600"></svg>
+<div class="tooltip"></div>
+
+<script>
+  const margin = {top: 40, right: 30, bottom: 60, left: 60},
+        width = 800 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
+
+  const svg = d3.select("svg")
+    .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const tooltip = d3.select(".tooltip");
+
+  d3.csv("scatter_flfp_2023_vs_fertility_2022.csv").then(data => {
+    // Clean and filter
+    data.forEach(d => {
+      d["Female Labor Force Participation"] = +d["Female Labor Force Participation"];
+      d["Fertility Rate"] = +d["Fertility Rate"];
+    });
+
+    const countries = ["United States", "France", "United Kingdom", "Germany", "Australia"];
+    const filtered = data.filter(d => countries.includes(d["Country Name"]));
+
+    // Scales
+    const x = d3.scaleLinear()
+      .domain(d3.extent(filtered, d => d["Female Labor Force Participation"]))
+      .nice()
+      .range([0, width]);
+
+    const y = d3.scaleLinear()
+      .domain(d3.extent(filtered, d => d["Fertility Rate"]))
+      .nice()
+      .range([height, 0]);
+
+    svg.append("g")
+      .attr("transform", `translate(0, ${height})`)
+      .call(d3.axisBottom(x));
+
+    svg.append("g")
+      .call(d3.axisLeft(y));
+
+    // Labels
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", height + 45)
+      .attr("text-anchor", "middle")
+      .text("Female Labor Force Participation (%)");
+
+    svg.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -height / 2)
+      .attr("y", -45)
+      .attr("text-anchor", "middle")
+      .text("Fertility Rate");
+
+    // Dots
+    svg.selectAll("circle")
+      .data(filtered)
+      .enter()
+      .append("circle")
+      .attr("cx", d => x(d["Female Labor Force Participation"]))
+      .attr("cy", d => y(d["Fertility Rate"]))
+      .attr("r", 6)
+      .on("mouseover", (event, d) => {
+        tooltip.transition().duration(200).style("opacity", 0.95);
+        tooltip.html(`<strong>${d["Country Name"]}</strong><br>FLFP: ${d["Female Labor Force Participation"].toFixed(1)}%<br>Fertility: ${d["Fertility Rate"].toFixed(2)}`)
+          .style("left", (event.pageX + 15) + "px")
+          .style("top", (event.pageY - 30) + "px");
+      })
+      .on("mouseout", () => tooltip.transition().duration(300).style("opacity", 0));
+
+    // Regression Line
+    const xMean = d3.mean(filtered, d => d["Female Labor Force Participation"]);
+    const yMean = d3.mean(filtered, d => d["Fertility Rate"]);
+    const slope = d3.sum(filtered, d => (d["Female Labor Force Participation"] - xMean) * (d["Fertility Rate"] - yMean)) /
+                  d3.sum(filtered, d => Math.pow(d["Female Labor Force Participation"] - xMean, 2));
+    const intercept = yMean - slope * xMean;
+
+    const xVals = d3.extent(filtered, d => d["Female Labor Force Participation"]);
+    const linePoints = xVals.map(xVal => ({
+      x: xVal,
+      y: slope * xVal + intercept
+    }));
+
+    svg.append("line")
+      .attr("x1", x(linePoints[0].x))
+      .attr("y1", y(linePoints[0].y))
+      .attr("x2", x(linePoints[1].x))
+      .attr("y2", y(linePoints[1].y))
+      .attr("stroke", "red")
+      .attr("stroke-width", 2)
+      .attr("stroke-dasharray", "5,5");
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Birth Rate Below Replacement Level</title>
+  <script type="module">
+    import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+
+    Promise.all([
+      d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson"),
+      d3.csv("Birth_Rate_Below_Replacement_Level.csv")
+    ]).then(([world, fertilityData]) => {
+      let fertilityMap = {};
+      fertilityData.forEach(d => {
+        fertilityMap[d["Country Name"]] = +d.Average_fertility;
+      });
+
+      const width = 1000, height = 600;
+
+      const projection = d3.geoNaturalEarth1()
+                           .scale(200)
+                           .translate([width / 2, height / 2]);
+
+      const path = d3.geoPath().projection(projection);
+
+      const colorScale = d3.scaleSequential()
+        .domain([1.2, 2.1])
+        .interpolator(d3.interpolateRdYlGn);
+
+      const svg = d3.select("body")
+                    .append("svg")
+                    .attr("id", "map-svg")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .style("background", "#a3ccff");
+
+      const tooltip = d3.select("body")
+                        .append("div")
+                        .style("position", "absolute")
+                        .style("background", "rgba(255,255,255,0.9)")
+                        .style("border", "1px solid #333")
+                        .style("border-radius", "8px")
+                        .style("padding", "8px")
+                        .style("font-size", "14px")
+                        .style("box-shadow", "2px 2px 10px rgba(0, 0, 0, 0.3)")
+                        .style("display", "none");
+
+      svg.selectAll("path")
+         .data(world.features)
+         .enter()
+         .append("path")
+         .attr("d", path)
+         .attr("fill", d => {
+             let countryName = d.properties.name;
+             let fertilityRate = fertilityMap[countryName];
+             return fertilityRate ? colorScale(fertilityRate) : "#e0e0e0";
+         })
+         .attr("stroke", "#fff")
+         .on("mouseover", function (event, d) {
+             let countryName = d.properties.name;
+             let fertilityRate = fertilityMap[countryName];
+
+             tooltip.style("display", "block")
+                    .html(`<strong>${countryName}</strong><br>${fertilityRate ? `Fertility Rate: ${fertilityRate.toFixed(2)}` : "No Data Available"}`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+
+             d3.select(this).attr("stroke", "#000")
+                            .attr("fill", fertilityRate ? "#ffcc00" : "#ddd");
+         })
+         .on("mousemove", function (event) {
+             tooltip.style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 10) + "px");
+         })
+         .on("mouseout", function (event, d) {
+             tooltip.style("display", "none");
+             let countryName = d.properties.name;
+             let fertilityRate = fertilityMap[countryName];
+             d3.select(this)
+               .attr("stroke", "#fff")
+               .attr("fill", fertilityRate ? colorScale(fertilityRate) : "#e0e0e0");
+         });
+
+      const legendHeight = 300, legendWidth = 20;
+      const legendScale = d3.scaleLinear().domain([1.2, 2.1]).range([legendHeight, 0]);
+
+      const legendSvg = svg.append("g")
+                           .attr("transform", `translate(${width - 50},50)`);
+
+      const defs = legendSvg.append("defs");
+      const gradient = defs.append("linearGradient")
+                           .attr("id", "legendGradient")
+                           .attr("x1", "0%")
+                           .attr("y1", "100%")
+                           .attr("x2", "0%")
+                           .attr("y2", "0%");
+
+      gradient.append("stop").attr("offset", "0%").attr("stop-color", d3.interpolateRdYlGn(0));
+      gradient.append("stop").attr("offset", "50%").attr("stop-color", d3.interpolateRdYlGn(0.5));
+      gradient.append("stop").attr("offset", "100%").attr("stop-color", d3.interpolateRdYlGn(1));
+
+      legendSvg.append("rect")
+               .attr("width", legendWidth)
+               .attr("height", legendHeight)
+               .style("fill", "url(#legendGradient)")
+               .attr("stroke", "#333");
+
+      legendSvg.append("g")
+               .attr("transform", `translate(${legendWidth},0)`)
+               .call(d3.axisRight(legendScale).ticks(5).tickFormat(d3.format(".1f")))
+               .select(".domain").remove();
+
+      document.getElementById('download-btn').addEventListener('click', () => {
+        const svgElement = document.getElementById("map-svg");
+        const serializer = new XMLSerializer();
+        let svgString = serializer.serializeToString(svgElement);
+        svgString = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n` + 
+                    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">\n` + 
+                    svgString + `\n</svg>`;
+        const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'fertility-rate-map.svg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      });
+
+    }).catch(error => {
+      console.error("Error loading data:", error);
+    });
+  </script>
+</head>
+<body>
+  <h2>Birth Rate Below Replacement Level</h2>
+  <svg></svg>
+  <button id="download-btn">Download Map</button>
+</body>
+</html>

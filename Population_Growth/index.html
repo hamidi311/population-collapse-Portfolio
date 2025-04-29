@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <title>Population Growth Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .bar {
+            fill: steelblue;
+        }
+        .axis-label {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        svg {
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Top 10 Countries with Lowest Population Growth</h2>
+    <svg id="low-growth-chart" width="800" height="400"></svg>
+
+    <h2>Top 10 Countries with Highest Population Growth</h2>
+    <svg id="high-growth-chart" width="800" height="400"></svg>
+
+    <script>
+        d3.csv("population_growth.csv").then(data => {
+            data.forEach(d => d.growth = +d["Population Growth"]);
+
+            let lowestGrowth = data.filter(d => d.growth < 0)
+                                   .sort((a, b) => a.growth - b.growth)
+                                   .slice(0, 10);
+
+            let highestGrowth = data.filter(d => d.growth > 0)
+                                    .sort((a, b) => b.growth - a.growth)
+                                    .slice(0, 10);
+
+            drawBarChart("#low-growth-chart", lowestGrowth, "red", [0, -12], "growth");
+            drawBarChart("#high-growth-chart", highestGrowth, "green", [1, 12], "growth");
+        });
+
+        function drawBarChart(svgId, data, color, yDomain, valueKey) {
+            const svg = d3.select(svgId);
+            const margin = { top: 20, right: 30, bottom: 80, left: 50 };
+            const width = +svg.attr("width") - margin.left - margin.right;
+            const height = +svg.attr("height") - margin.top - margin.bottom;
+
+            const x = d3.scaleBand()
+                .domain(data.map(d => d["Country Name"]))
+                .range([0, width])
+                .padding(0.3);
+
+            const y = d3.scaleLinear()
+                .domain(yDomain)
+                .range([height, 0]);
+
+            const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+            g.append("g")
+                .call(d3.axisLeft(y).ticks(13))  // Updated tick count to show increments by 1
+                .attr("transform", "translate(0,0)");
+
+            g.append("g")
+                .call(d3.axisBottom(x))
+                .attr("transform", `translate(0,${height})`)
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            g.selectAll(".bar")
+                .data(data)
+                .enter()
+                .append("rect")
+                .attr("class", "bar")
+                .attr("fill", color)
+                .attr("x", d => x(d["Country Name"]))
+                .attr("width", x.bandwidth())
+                .attr("y", d => y(d[valueKey]))
+                .attr("height", d => height - y(d[valueKey]));
+
+            g.append("text")
+                .attr("class", "axis-label")
+                .attr("x", width / 2)
+                .attr("y", height + 60)
+                .attr("text-anchor", "middle")
+                .text("Country");
+        }
+    </script>
+</body>
+</html>

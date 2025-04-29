@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Top & Bottom 5 Countries by Population Growth and Religion</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+
+    svg {
+      font: 12px sans-serif;
+    }
+
+    .bar.muslim {
+      fill: #2ca02c;
+    }
+
+    .bar.christian {
+      fill: #1f77b4;
+    }
+
+    .label {
+      fill: black;
+      font-size: 11px;
+      text-anchor: middle;
+    }
+
+    .tooltip {
+      position: absolute;
+      text-align: left;
+      padding: 8px;
+      font: 12px sans-serif;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      pointer-events: none;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Top & Bottom 5 Countries by Population Growth and Religion</h2>
+<svg width="800" height="450"></svg>
+
+<script>
+  d3.csv("country_religion_avg_population_growth.csv").then(data => {
+    data.forEach(d => d["Population Growth"] = +d["Population Growth"]);
+
+    data.sort((a, b) => b["Population Growth"] - a["Population Growth"]);
+
+    const top5 = data.slice(0, 5);
+    const bottom5 = data.slice(-5);
+    const filtered = top5.concat(bottom5.reverse());
+
+    const margin = {top: 60, right: 30, bottom: 100, left: 60},
+          width = 800 - margin.left - margin.right,
+          height = 450 - margin.top - margin.bottom;
+
+    const svg = d3.select("svg")
+      .html("")
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleBand()
+      .domain(filtered.map(d => d["Country Name"]))
+      .range([0, width])
+      .padding(0.2);
+
+    const y = d3.scaleLinear()
+      .domain([
+        d3.min(filtered, d => d["Population Growth"]),
+        d3.max(filtered, d => d["Population Growth"])
+      ])
+      .range([height, 0]);
+
+    svg.append("g")
+      .attr("transform", `translate(0, ${height})`)
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      .attr("transform", "rotate(-40)")
+      .style("text-anchor", "end");
+
+    svg.append("g").call(d3.axisLeft(y));
+
+    // Draw the zero baseline
+    svg.append("line")
+      .attr("x1", 0)
+      .attr("x2", width)
+      .attr("y1", y(0))
+      .attr("y2", y(0))
+      .attr("stroke", "black");
+
+    // Tooltip
+    const tooltip = d3.select("body").append("div").attr("class", "tooltip");
+
+    // Bars with animation
+    svg.selectAll(".bar")
+      .data(filtered)
+      .enter()
+      .append("rect")
+      .attr("class", d => `bar ${d["Majority Religion"].toLowerCase()}`)
+      .attr("x", d => x(d["Country Name"]))
+      .attr("width", x.bandwidth())
+      .attr("y", y(0))
+      .attr("height", 0)
+      .on("mouseover", (event, d) => {
+        tooltip.transition().duration(200).style("opacity", 0.9);
+        tooltip.html(`<strong>${d["Country Name"]}</strong><br>Religion: ${d["Majority Religion"]}<br>Growth: ${d["Population Growth"].toFixed(2)}%`)
+               .style("left", (event.pageX + 10) + "px")
+               .style("top", (event.pageY - 40) + "px");
+      })
+      .on("mouseout", () => tooltip.transition().duration(300).style("opacity", 0))
+      .transition()
+      .duration(1000)
+      .attr("y", d => d["Population Growth"] >= 0 ? y(d["Population Growth"]) : y(0))
+      .attr("height", d => Math.abs(y(d["Population Growth"]) - y(0)));
+
+    // Labels
+    svg.selectAll(".label")
+      .data(filtered)
+      .enter()
+      .append("text")
+      .attr("class", "label")
+      .attr("x", d => x(d["Country Name"]) + x.bandwidth() / 2)
+      .attr("y", d => d["Population Growth"] >= 0 ? y(d["Population Growth"]) - 5 : y(d["Population Growth"]) + 15)
+      .text(d => d["Population Growth"].toFixed(2));
+
+    // Legend
+    const legend = d3.select("svg")
+      .append("g")
+      .attr("transform", `translate(${width + 20}, 30)`);
+
+    const religions = ["Muslim", "Christian"];
+    const colors = {"Muslim": "#2ca02c", "Christian": "#1f77b4"};
+
+    religions.forEach((religion, i) => {
+      legend.append("rect")
+        .attr("x", -80)
+        .attr("y", i * 20)
+        .attr("width", 12)
+        .attr("height", 12)
+        .attr("fill", colors[religion]);
+
+      legend.append("text")
+        .attr("x", -60)
+        .attr("y", i * 20 + 10)
+        .text(religion)
+        .attr("font-size", "12px")
+        .attr("alignment-baseline", "middle");
+    });
+  });
+</script>
+
+</body>
+</html>

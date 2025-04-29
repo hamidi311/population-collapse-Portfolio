@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Adoption by Region</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: sans-serif; }
+    .x-axis text { font-size: 12px; }
+    .y-axis text { font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h2>AI Adoption by Region (2021 vs 2024)</h2>
+  <svg width="900" height="500"></svg>
+
+  <script>
+    const svg = d3.select("svg"),
+          margin = {top: 40, right: 100, bottom: 50, left: 60},
+          width = +svg.attr("width") - margin.left - margin.right,
+          height = +svg.attr("height") - margin.top - margin.bottom;
+
+    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+    d3.csv("ai_adoption_cleaned.csv").then(data => {
+      const keys = ["2021", "2024"];
+
+      data.forEach(d => {
+        keys.forEach(key => {
+          d[key] = +d[key]; // Convert values to numbers
+        });
+      });
+
+      const x0 = d3.scaleBand()
+                   .domain(data.map(d => d.Region))
+                   .rangeRound([0, width])
+                   .paddingInner(0.1);
+
+      const x1 = d3.scaleBand()
+                   .domain(keys)
+                   .rangeRound([0, x0.bandwidth()])
+                   .padding(0.05);
+
+      const y = d3.scaleLinear()
+                  .domain([0, 100])
+                  .range([height, 0]);
+
+      const color = d3.scaleOrdinal()
+                      .domain(keys)
+                      .range(["#1f77b4", "#ff7f0e"]);
+
+      g.append("g")
+        .selectAll("g")
+        .data(data)
+        .join("g")
+          .attr("transform", d => `translate(${x0(d.Region)},0)`)
+        .selectAll("rect")
+        .data(d => keys.map(key => ({key: key, value: d[key]})))
+        .join("rect")
+          .attr("x", d => x1(d.key))
+          .attr("y", d => y(d.value))
+          .attr("width", x1.bandwidth())
+          .attr("height", d => height - y(d.value))
+          .attr("fill", d => color(d.key));
+
+      g.append("g")
+        .attr("class", "x-axis")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x0));
+
+      g.append("g")
+        .attr("class", "y-axis")
+        .call(d3.axisLeft(y).ticks(10).tickFormat(d => d + "%"));
+
+      const legend = svg.append("g")
+          .attr("transform", `translate(${width + margin.left + 10}, 30)`);
+
+      keys.forEach((key, i) => {
+        const row = legend.append("g").attr("transform", `translate(0, ${i * 20})`);
+        row.append("rect")
+          .attr("width", 12)
+          .attr("height", 12)
+          .attr("fill", color(key));
+        row.append("text")
+          .attr("x", 18)
+          .attr("y", 10)
+          .text(key);
+      });
+    });
+  </script>
+</body>
+</html>

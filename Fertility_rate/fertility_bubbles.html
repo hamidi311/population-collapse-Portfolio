@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fertility Rate Heatmap</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #fdfdfd;
+    }
+
+    .cell {
+      stroke: white;
+      stroke-width: 2px;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: white;
+      border: 1px solid #aaa;
+      padding: 8px;
+      font-size: 13px;
+      border-radius: 5px;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    text {
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Fertility Rate Heatmap — Top & Bottom 15 Countries</h2>
+<svg width="1000" height="200"></svg>
+
+<script>
+  const svg = d3.select("svg");
+  const width = +svg.attr("width");
+  const height = +svg.attr("height");
+
+  const tooltip = d3.select("body").append("div").attr("class", "tooltip");
+
+  d3.csv("top_bottom_fertility_rate.csv").then(data => {
+    data.forEach(d => {
+      d["Fertility Rate"] = +d["Fertility Rate"];
+    });
+
+    const x = d3.scaleBand()
+      .domain(data.map(d => d["Country Name"]))
+      .range([80, width - 40])
+      .padding(0.1);
+
+    const y = d3.scaleBand()
+      .domain(["Fertility"])
+      .range([0, 80]);
+
+    const color = d3.scaleSequential()
+      .domain([d3.min(data, d => d["Fertility Rate"]), d3.max(data, d => d["Fertility Rate"])])
+      .interpolator(d3.interpolateYlGnBu); // blue-green scale (cleaner feel)
+
+    svg.selectAll(".cell")
+      .data(data)
+      .enter()
+      .append("rect")
+      .attr("x", d => x(d["Country Name"]))
+      .attr("y", y("Fertility"))
+      .attr("width", x.bandwidth())
+      .attr("height", y.bandwidth())
+      .attr("fill", d => color(d["Fertility Rate"]))
+      .attr("class", "cell")
+      .on("mouseover", (event, d) => {
+        tooltip.transition().duration(200).style("opacity", 0.95);
+        tooltip.html(`<strong>${d["Country Name"]}</strong><br>Fertility Rate: ${d["Fertility Rate"].toFixed(2)}`)
+          .style("left", (event.pageX + 15) + "px")
+          .style("top", (event.pageY - 30) + "px");
+      })
+      .on("mouseout", () => tooltip.transition().duration(300).style("opacity", 0));
+
+    // Country labels
+    svg.selectAll(".x-label")
+      .data(data)
+      .enter()
+      .append("text")
+      .attr("class", "x-label")
+      .attr("x", d => x(d["Country Name"]) + x.bandwidth() / 2)
+      .attr("y", 110)
+      .text(d => d["Country Name"])
+      .attr("text-anchor", "end")
+      .attr("transform", d => `rotate(-40, ${x(d["Country Name"]) + x.bandwidth() / 2}, 110)`);
+
+    // Row label
+    svg.append("text")
+      .attr("x", 10)
+      .attr("y", y("Fertility") + y.bandwidth() / 2 + 5)
+      .text("Fertility Rate")
+      .attr("font-weight", "bold");
+
+    // Color legend (optional)
+    const defs = svg.append("defs");
+
+    const legendWidth = 200;
+    const legendHeight = 10;
+
+    const gradient = defs.append("linearGradient")
+      .attr("id", "legend-gradient");
+
+    gradient.selectAll("stop")
+      .data([
+        {offset: "0%", color: color.range()[0]},
+        {offset: "100%", color: color.range()[1]}
+      ])
+      .enter()
+      .append("stop")
+      .attr("offset", d => d.offset)
+      .attr("stop-color", d => d.color);
+
+    svg.append("rect")
+      .attr("x", width - legendWidth - 30)
+      .attr("y", 20)
+      .attr("width", legendWidth)
+      .attr("height", legendHeight)
+      .style("fill", "url(#legend-gradient)");
+
+    svg.append("text")
+      .attr("x", width - legendWidth - 30)
+      .attr("y", 15)
+      .text("Fertility Rate Scale")
+      .attr("font-size", "12px");
+
+    svg.append("text")
+      .attr("x", width - legendWidth - 30)
+      .attr("y", 45)
+      .text(d3.min(data, d => d["Fertility Rate"]).toFixed(1));
+
+    svg.append("text")
+      .attr("x", width - 30)
+      .attr("y", 45)
+      .attr("text-anchor", "end")
+      .text(d3.max(data, d => d["Fertility Rate"]).toFixed(1));
+  });
+</script>
+
+</body>
+</html>

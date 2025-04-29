@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Top 20 Countries by Death Rate – Creative View</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 40px;
+      text-align: center;
+      background: #fafafa;
+    }
+    .tooltip {
+      position: absolute;
+      background: white;
+      border: 1px solid #aaa;
+      padding: 8px;
+      border-radius: 5px;
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    text.label {
+      font-size: 11px;
+      fill: #333;
+    }
+  </style>
+</head>
+<body>
+
+<h3>Top 20 Countries by Death Rate – Creative View</h3>
+<svg width="700" height="700"></svg>
+<div class="tooltip"></div>
+
+<script>
+  const width = 700, height = 700;
+  const innerRadius = 120, outerRadius = 300;
+
+  const svg = d3.select("svg")
+    .append("g")
+    .attr("transform", `translate(${width / 2},${height / 2})`);
+
+  const tooltip = d3.select(".tooltip");
+
+  d3.csv("top_20_death_rate.csv").then(data => {
+    data.forEach(d => d["Death Rate"] = +d["Death Rate"]);
+
+    const angle = d3.scaleBand()
+      .domain(data.map(d => d["Country Name"]))
+      .range([0, 2 * Math.PI])
+      .padding(0.05);
+
+    const radius = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d["Death Rate"])])
+      .range([innerRadius, outerRadius]);
+
+    const color = d3.scaleLinear()
+      .domain([d3.min(data, d => d["Death Rate"]), d3.max(data, d => d["Death Rate"])])
+      .range(["#ff9999", "#b30000"]);
+
+    // Arcs
+    svg.selectAll("path")
+      .data(data)
+      .enter()
+      .append("path")
+      .attr("fill", d => color(d["Death Rate"]))
+      .transition()
+      .duration(1000)
+      .attrTween("d", function(d) {
+        const i = d3.interpolate(innerRadius, radius(d["Death Rate"]));
+        return t => d3.arc()({
+          innerRadius: innerRadius,
+          outerRadius: i(t),
+          startAngle: angle(d["Country Name"]),
+          endAngle: angle(d["Country Name"]) + angle.bandwidth(),
+          padAngle: 0.01,
+          padRadius: innerRadius
+        });
+      });
+
+    // Hover interaction
+    svg.selectAll("path")
+      .data(data)
+      .on("mouseover", (event, d) => {
+        tooltip.transition().duration(200).style("opacity", 0.95);
+        tooltip.html(`<strong>${d["Country Name"]}</strong><br>Death Rate: ${d["Death Rate"]}‰`)
+          .style("left", (event.pageX + 10) + "px")
+          .style("top", (event.pageY - 30) + "px");
+      })
+      .on("mouseout", () => tooltip.transition().duration(300).style("opacity", 0));
+
+    // Labels
+    svg.selectAll(".label")
+      .data(data)
+      .enter()
+      .append("text")
+      .attr("class", "label")
+      .attr("x", d => Math.sin(angle(d["Country Name"]) + angle.bandwidth()/2) * (outerRadius + 15))
+      .attr("y", d => -Math.cos(angle(d["Country Name"]) + angle.bandwidth()/2) * (outerRadius + 15))
+      .attr("text-anchor", "middle")
+      .attr("alignment-baseline", "middle")
+      .text(d => d["Country Name"]);
+  });
+</script>
+
+</body>
+</html>

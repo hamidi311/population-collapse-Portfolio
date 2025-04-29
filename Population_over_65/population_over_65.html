@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Population Over 65 Visualizations</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #fff;
+      padding: 20px;
+    }
+    h2 {
+      margin-top: 40px;
+      color: #1a1a1a;
+    }
+    .axis-label {
+      font-size: 14px;
+      font-weight: bold;
+      fill: #333;
+    }
+    .tooltip {
+      position: absolute;
+      background: white;
+      border: 1px solid #999;
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 4px;
+      pointer-events: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      opacity: 0;
+      transition: 0.2s;
+    }
+  </style>
+</head>
+<body>
+  <h2>Population Over 65 - Line Chart (Global Trend)</h2>
+  <svg id="lineChart" width="800" height="400"></svg>
+
+  <h2>Top 10 Countries with the Oldest Population (2022)</h2>
+  <svg id="barChart" width="800" height="500"></svg>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    const file = "population_over_65.csv";
+
+    d3.csv(file).then(data => {
+      const tooltip = d3.select("#tooltip");
+
+      data.forEach(d => {
+        d.Year = +d["Year"];
+        d["Population Over 65"] = +d["Population Over 65"];
+      });
+
+      // -------- Line Chart --------
+      const globalByYear = d3.rollup(
+        data,
+        v => d3.sum(v, d => d["Population Over 65"]),
+        d => d.Year
+      );
+
+      const globalData = Array.from(globalByYear, ([year, population_over_65]) => ({ year, population_over_65 }));
+      globalData.sort((a, b) => a.year - b.year);
+
+      const lineSvg = d3.select("#lineChart");
+      const margin = {top: 30, right: 30, bottom: 50, left: 70};
+      const width = +lineSvg.attr("width") - margin.left - margin.right;
+      const height = +lineSvg.attr("height") - margin.top - margin.bottom;
+      const g = lineSvg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const x = d3.scaleLinear()
+                  .domain(d3.extent(globalData, d => d.year))
+                  .range([0, width]);
+
+      const y = d3.scaleLinear()
+                  .domain([0, d3.max(globalData, d => d.population_over_65)])
+                  .range([height, 0]);
+
+      const line = d3.line()
+                     .x(d => x(d.year))
+                     .y(d => y(d.population_over_65));
+
+      g.append("path")
+        .datum(globalData)
+        .attr("fill", "none")
+        .attr("stroke", "#0b84a5")
+        .attr("stroke-width", 2)
+        .attr("d", line);
+
+      g.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickFormat(d3.format("d")));
+
+      g.append("g").call(d3.axisLeft(y));
+
+      // Axis labels
+      lineSvg.append("text")
+        .attr("x", width / 2 + margin.left)
+        .attr("y", height + margin.top + 40)
+        .attr("text-anchor", "middle")
+        .attr("class", "axis-label")
+        .text("Year");
+
+      lineSvg.append("text")
+        .attr("x", -height / 2 - margin.top)
+        .attr("y", 20)
+        .attr("transform", "rotate(-90)")
+        .attr("text-anchor", "middle")
+        .attr("class", "axis-label")
+        .text("Global Population Over 65");
+
+      // Dots with tooltips
+      g.selectAll("circle")
+        .data(globalData)
+        .enter()
+        .append("circle")
+        .attr("cx", d => x(d.year))
+        .attr("cy", d => y(d.population_over_65))
+        .attr("r", 3)
+        .attr("fill", "#0b84a5")
+        .on("mouseover", (event, d) => {
+          tooltip.style("opacity", 1)
+            .html(`<strong>Year:</strong> ${d.year}<br><strong>Population:</strong> ${d.population_over_65.toFixed(2)}`)
+            .style("left", event.pageX + 10 + "px")
+            .style("top", event.pageY - 28 + "px");
+        })
+        .on("mouseout", () => tooltip.style("opacity", 0));
+
+      // -------- Bar Chart (Top 10, 2022) --------
+      const latestYear = 2022;
+      const latestData = data.filter(d => d.Year === latestYear);
+      const top10 = latestData.sort((a, b) => b["Population Over 65"] - a["Population Over 65"]).slice(0, 10);
+
+      const barSvg = d3.select("#barChart");
+      const barMargin = {top: 30, right: 30, bottom: 130, left: 70};
+      const barWidth = +barSvg.attr("width") - barMargin.left - barMargin.right;
+      const barHeight = +barSvg.attr("height") - barMargin.top - barMargin.bottom;
+      const barG = barSvg.append("g").attr("transform", `translate(${barMargin.left},${barMargin.top})`);
+
+      const xBar = d3.scaleBand()
+                     .domain(top10.map(d => d["Country Name"]))
+                     .range([0, barWidth])
+                     .padding(0.2);
+
+      const yBar = d3.scaleLinear()
+                     .domain([0, d3.max(top10, d => d["Population Over 65"])])
+                     .range([barHeight, 0]);
+
+      barG.selectAll(".bar")
+        .data(top10)
+        .enter()
+        .append("rect")
+        .attr("x", d => xBar(d["Country Name"]))
+        .attr("y", barHeight)
+        .attr("width", xBar.bandwidth())
+        .attr("height", 0)
+        .attr("fill", "#50b432")
+        .on("mouseover", (event, d) => {
+          tooltip.style("opacity", 1)
+            .html(`<strong>${d["Country Name"]}</strong><br>Population Over 65: ${d["Population Over 65"].toFixed(2)}`)
+            .style("left", event.pageX + 10 + "px")
+            .style("top", event.pageY - 28 + "px");
+        })
+        .on("mouseout", () => tooltip.style("opacity", 0))
+        .transition()
+        .duration(800)
+        .attr("y", d => yBar(d["Population Over 65"]))
+        .attr("height", d => barHeight - yBar(d["Population Over 65"]));
+
+      barG.append("g")
+          .attr("transform", `translate(0,${barHeight})`)
+          .call(d3.axisBottom(xBar))
+          .selectAll("text")
+          .attr("transform", "rotate(-45)")
+          .style("text-anchor", "end");
+
+      barG.append("g").call(d3.axisLeft(yBar));
+
+      barSvg.append("text")
+        .attr("x", barWidth / 2 + barMargin.left)
+        .attr("y", barHeight + barMargin.top + 100)
+        .attr("text-anchor", "middle")
+        .attr("class", "axis-label")
+        .text("Country");
+
+      barSvg.append("text")
+        .attr("x", -barHeight / 2 - barMargin.top)
+        .attr("y", 20)
+        .attr("transform", "rotate(-90)")
+        .attr("text-anchor", "middle")
+        .attr("class", "axis-label")
+        .text("Population Over 65");
+    });
+  </script>
+</body>
+</html>
